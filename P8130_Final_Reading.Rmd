@@ -85,6 +85,7 @@ lm(reading_score ~ . + parent_educ*parent_marital_status+ lunch_type*practice_sp
 
 
 ```{r}
+set.seed(1111)
 model1 <- lm(reading_score ~ ., data = reading)
 
 model2 <- lm(reading_score ~ . + parent_educ*parent_marital_status + lunch_type*practice_sport, data = reading)
@@ -96,35 +97,62 @@ print(anova_results)
 Based on the significance condition of overall regression, we select two interaction term: `parent_educ*parent_marital_status` and `lunch_type*practice_sport`. Then we apply ANOVA to test whether adding the interaction term is better. The ANOVA P value = 0.04374 less than 0.05, indicating that the model with the addition of interaction terms significantly improves the fitting effect.
 
 ```{r}
+# check the Multicollinearity
+library(car)
+vif(model2)
+# all GVIF^(1/(2*Df)) are smaller than 5
+```
 
-# Load the library
-library(corrplot)
-
-excluded_vars <- c("math_score", "writing_score", "reading_score")
-predictors <- school_transformed[, !names(school_transformed) %in% excluded_vars]
-predictors_numeric <- predictors[, sapply(predictors, is.numeric)]
-
-# Compute the correlation matrix
-cor_matrix <- cor(predictors_numeric, use = "pairwise.complete.obs")  # Ensures missing values are handled
-
-# Plot the correlation matrix using corrplot
-corrplot(cor_matrix, 
-         method = "color",        # Use color to display correlations
-         type = "upper",          # Show only the upper triangle
-         order = "hclust",        # Cluster variables with similar correlations
-         addCoef.col = "black",   # Add correlation coefficients in black
-         tl.col = "black",        # Text label color
-         tl.srt = 45,             # Rotate axis labels
-         col = colorRampPalette(c("blue", "white", "red"))(200)  # Color scale
-)
+```{r}
+# check correlation problem
+library(ggcorrplot)
+ggcorrplot(cor_matrix, hc.order = TRUE, type = "lower")
 
 ```
 
 
-
 ```{r}
-lm(math_score ~ . , data = math) |>
-  summary()
+# 诊断图
+par(mfrow = c(2, 2))
+plot(model2)
+
+# 检查残差正态性
+shapiro.test(residuals(model2))
+## not normal --> need to transform
+
+# 检查多重共线性
+library(car)
+vif_values <- vif(model2)
+print(vif_values)
+```
+```{r}
+# Box-Cox
+library(MASS)
+boxcox_result <- boxcox(model2, lambda = seq(-2, 2, 0.1))
+
+optimal_lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+cat("Optimal Lambda:", optimal_lambda, "\n")
+```
+```{r}
+# Transform Y based on the optimal lambda = 1.434343
+reading_trans <- reading |>
+  mutate(reading_score_trans = (reading$reading_score^optimal_lambda - 1) / optimal_lambda)
+
+
+# check normality
+hist(reading_trans$reading_score_trans, main = "Transformed Reading Score", xlab = "Transformed Score")
+
+```
+```{r}
+library(dplyr)
+# transformed model
+reading_trans =
+  reading_trans |>  select(-reading_score)
+
+model3 <- lm(school$reading_score_trans ~ . + parent_educ*parent_marital_status + lunch_type*practice_sport, data = reading)
+
+summary(model3)
+
 ```
 
 
