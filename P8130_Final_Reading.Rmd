@@ -103,24 +103,19 @@ vif(model2)
 # all GVIF^(1/(2*Df)) are smaller than 5
 ```
 
-```{r}
-# check correlation problem
-library(ggcorrplot)
-ggcorrplot(cor_matrix, hc.order = TRUE, type = "lower")
 
-```
 
 
 ```{r}
-# 诊断图
+# Plots
 par(mfrow = c(2, 2))
 plot(model2)
 
-# 检查残差正态性
+# Check residual normality
 shapiro.test(residuals(model2))
 ## not normal --> need to transform
 
-# 检查多重共线性
+# Multicollinearity
 library(car)
 vif_values <- vif(model2)
 print(vif_values)
@@ -136,7 +131,7 @@ cat("Optimal Lambda:", optimal_lambda, "\n")
 ```{r}
 # Transform Y based on the optimal lambda = 1.434343
 reading_trans <- reading |>
-  mutate(reading_score_trans = (reading$reading_score^optimal_lambda - 1) / optimal_lambda)
+  mutate(reading_score_trans = (reading_score^optimal_lambda - 1) / optimal_lambda)
 
 
 # check normality
@@ -145,14 +140,104 @@ hist(reading_trans$reading_score_trans, main = "Transformed Reading Score", xlab
 ```
 ```{r}
 library(dplyr)
-# transformed model
-reading_trans =
-  reading_trans |>  select(-reading_score)
 
-model3 <- lm(school$reading_score_trans ~ . + parent_educ*parent_marital_status + lunch_type*practice_sport, data = reading)
 
-summary(model3)
+# Remove the original `reading_score` column
+reading_trans <- 
+  reading_trans %>% dplyr::select(-reading_score)
 
+# Fit the transformed model
+model3 <- lm(reading_score_trans ~ . + parent_educ * parent_marital_status + lunch_type * practice_sport, data = reading_trans)
+
+# Display the summary of the model
+summary(model3) # improve in adjusted R2
+```
+
+
+```{r}
+# plots
+par(mfrow = c(2, 2))
+plot(model3)
+
+# 检查多重共线性
+vif_values <- vif(model3)
+print(vif_values)
+```
+
+```{r}
+# Check residual normality
+shapiro.test(residuals(model3))
+## normal
+```
+
+```{r, message = FALSE, warning=FALSE}
+# Automatic Subset Selection Procedures based on Model3
+library(leaps)
+library(dplyr)
+library(tidyverse)
+
+# backward elimination
+backward_model <- step(model3, direction = "backward")
+
+# Stepwise Regression
+stepwise_model <- step(model3, direction = "both")
+
+# Summaries of the models
+summary(backward_model)
+summary(stepwise_model)
+```
+From xx
+
+
+```{r, message = FALSE, warning=FALSE}
+# Criterion-based procedures
+# Perform all subset regression for model3
+subset_selection <- regsubsets(reading_score_trans ~ . + parent_educ * parent_marital_status + lunch_type * practice_sport, data = reading_trans, nvmax = NULL)
+
+# Get the summary of the subset selection
+subset_sum <- summary(subset_selection)
+
+# Extract the best models by different criteria
+best_models <- data.frame(
+  R2 = subset_sum$rsq,
+  Adjusted_R2 = subset_sum$adjr2,
+  Cp = subset_sum$cp,
+  BIC = subset_sum$bic
+) |> knitr::kable()
+
+# Print the best models table
+print(best_models)
+
+# Get the selected variables for the best models
+selected_variables <- 
+  subset_sum$outmat |>
+  knitr::kable()
+  
+print(selected_variables)
+```
+
+```{r, message = FALSE, warning=FALSE}
+# LASSO
+library(glmnet)
+
+# Create the design matrix for the predictors
+X_matrix <- model.matrix(reading_score_trans ~ . + parent_educ * parent_marital_status + lunch_type * practice_sport, data = reading_trans)
+
+# Create the response vector
+y_vector <- reading_trans$reading_score_trans
+
+# Perform cross-validated LASSO
+lasso_cv <- cv.glmnet(X_matrix, y_vector, alpha = 1)
+
+# Get the best lambda value
+best_lambda <- lasso_cv$lambda.min
+
+# Fit LASSO with the best lambda
+lasso_model <- glmnet(X_matrix, y_vector, alpha = 1, lambda = best_lambda)
+
+# Display the coefficients of the LASSO model
+coefficients <- coef(lasso_model)
+print(coefficients)
 ```
 
 
