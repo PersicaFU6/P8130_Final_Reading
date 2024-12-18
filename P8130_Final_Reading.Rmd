@@ -1,0 +1,131 @@
+---
+title: "P8130_Final_Reading"
+author: "Yujing FU"
+date: "2024-12-18"
+output: html_document
+---
+```{r message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(caret)
+```
+
+```{r}
+# import dataset (whole data)
+school <- read.csv("Project_1_data.csv", na = c("NA", ",", "")) |>
+  janitor::clean_names() |>
+  drop_na()
+
+# dataset for math score
+math <- school |>
+  select(-reading_score, -writing_score)
+
+# dataset for reading score
+reading <- school |>
+  select(-math_score, -writing_score)
+
+# dataset for writing score
+writing <- school |>
+  select(-math_score, -reading_score)
+```
+
+```{r}
+# whole school dataset transformed to indicator 0, 1, 2, 3, ...
+school_transformed <- school |>
+  mutate(across(everything(), as.factor)) |>
+  mutate(across(where(is.factor), ~ as.integer(as.factor(.x)) - 1))
+
+# whole school dataset transformed to indicator only containing 0 and 1
+indicator_school <- as.data.frame(model.matrix(~ . - 1, data = school))
+
+# math score indicator dataset
+indicator_math <- indicator_school |>
+  select(-reading_score, -writing_score)
+
+# reading score indicator dataset
+indicator_reading <- indicator_school |>
+  select(-math_score, -writing_score)
+
+# writing score indicator dataset
+indicator_writing <- indicator_school |>
+  select(-math_score, -reading_score)
+```
+
+
+
+
+
+```{r}
+# model for reading_score
+excluded_vars <- c("writing_score", "math_score")
+predictors <- school[, !names(school) %in% excluded_vars]
+
+# Define the response variable and the predictors
+response <- school$reading_score
+predictors <- predictors[, !names(predictors) %in% "reading_score"]
+
+# Generate a formula with interaction terms for all pairwise combinations of predictors
+predictor_names <- colnames(predictors)
+interaction_terms <- paste(predictor_names, collapse = " + ")
+formula <- as.formula(paste("reading_score ~ (", interaction_terms, ")^2"))
+
+# Fit the linear regression model
+model <- lm(formula, data = school)
+summary(model)
+```
+From this overall linear regression model, we notice there are some significant covariates such as ??
+
+```{r}
+lm(reading_score ~ . + parent_educ*parent_marital_status+ lunch_type*practice_sport
+, data = reading) |>
+  summary()
+```
+
+
+
+```{r}
+model1 <- lm(reading_score ~ ., data = reading)
+
+model2 <- lm(reading_score ~ . + parent_educ*parent_marital_status + lunch_type*practice_sport, data = reading)
+
+anova_results <- anova(model1, model2)
+
+print(anova_results)
+```
+Based on the significance condition of overall regression, we select two interaction term: `parent_educ*parent_marital_status` and `lunch_type*practice_sport`. Then we apply ANOVA to test whether adding the interaction term is better. The ANOVA P value = 0.04374 less than 0.05, indicating that the model with the addition of interaction terms significantly improves the fitting effect.
+
+```{r}
+
+# Load the library
+library(corrplot)
+
+excluded_vars <- c("math_score", "writing_score", "reading_score")
+predictors <- school_transformed[, !names(school_transformed) %in% excluded_vars]
+predictors_numeric <- predictors[, sapply(predictors, is.numeric)]
+
+# Compute the correlation matrix
+cor_matrix <- cor(predictors_numeric, use = "pairwise.complete.obs")  # Ensures missing values are handled
+
+# Plot the correlation matrix using corrplot
+corrplot(cor_matrix, 
+         method = "color",        # Use color to display correlations
+         type = "upper",          # Show only the upper triangle
+         order = "hclust",        # Cluster variables with similar correlations
+         addCoef.col = "black",   # Add correlation coefficients in black
+         tl.col = "black",        # Text label color
+         tl.srt = 45,             # Rotate axis labels
+         col = colorRampPalette(c("blue", "white", "red"))(200)  # Color scale
+)
+
+```
+
+
+
+```{r}
+lm(math_score ~ . , data = math) |>
+  summary()
+```
+
+
+
