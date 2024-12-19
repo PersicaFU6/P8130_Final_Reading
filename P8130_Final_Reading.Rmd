@@ -2,7 +2,7 @@
 title: "P8130_Final_Reading"
 author: "Yujing FU"
 date: "2024-12-18"
-output: html_document
+output: github_document
 ---
 ```{r message=FALSE}
 library(tidyverse)
