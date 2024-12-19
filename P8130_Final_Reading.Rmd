@@ -197,18 +197,23 @@ stepwise_model <- step(model3, direction = "both")
 summary(backward_model)
 summary(stepwise_model)
 ```
-From xx
 
 
-```{r, message = FALSE, warning=FALSE}
-# Criterion-based procedures
-# Perform all subset regression for model3
-subset_selection <- regsubsets(reading_score_trans ~ . + parent_educ * parent_marital_status + lunch_type * practice_sport, data = reading_trans, nvmax = NULL)
+```{r}
+library(leaps)
+library(knitr)
 
-# Get the summary of the subset selection
+# all subset regression
+subset_selection <- regsubsets(
+  reading_score_trans ~ . + parent_educ * parent_marital_status + lunch_type * practice_sport,
+  data = reading_trans,
+  nvmax = NULL
+)
+
+# summary of subsets
 subset_sum <- summary(subset_selection)
 
-# Extract the best models by different criteria
+# criterions
 best_models <- data.frame(
   R2 = subset_sum$rsq,
   Adjusted_R2 = subset_sum$adjr2,
@@ -216,17 +221,33 @@ best_models <- data.frame(
   BIC = subset_sum$bic
 ) |> knitr::kable()
 
-# Print the best models table
-print(best_models)
 
-# Get the selected variables for the best models
-selected_variables <- 
-  subset_sum$outmat |>
-  knitr::kable()
-  
-print(selected_variables)
+# print out best models
+best_adjr2 <- which.max(subset_sum$adjr2)
+best_cp <- which.min(subset_sum$cp)
+best_bic <- which.min(subset_sum$bic)
+
+best_model_adjr2 <- names(which(subset_sum$which[best_adjr2, -1]))
+best_model_cp <- names(which(subset_sum$which[best_cp, -1]))
+best_model_bic <- names(which(subset_sum$which[best_bic, -1]))
+
+cat("Best model based on Adjusted R2 is:\n")
+print(best_model_adjr2)
+cat("Best model based on Cp is:\n")
+print(best_model_cp)
+cat("Best model based on BIC is:\n")
+print(best_model_bic)
+
 ```
 
+```{r}
+# print models
+model_cp <- lm(reading_score_trans ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + wkly_study_hours + parent_educ:parent_marital_status + lunch_type:practice_sport, data = reading_trans)
+summary(model_cp)
+
+model_bic <- lm(reading_score_trans ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_educ:parent_marital_status, data = reading_trans)
+summary(model_bic)
+```
 
 
 ```{r, message = FALSE, warning=FALSE}
@@ -247,11 +268,27 @@ best_lambda <- lasso_cv$lambda.min
 
 # Fit LASSO with the best lambda
 lasso_model <- glmnet(X_matrix, y_vector, alpha = 1, lambda = best_lambda)
-
-# Display the coefficients of the LASSO model
-coefficients <- coef(lasso_model)
-print(coefficients)
 ```
+
+```{r}
+coefficients_matrix <- coef(lasso_model)
+# Convert the coefficients matrix to a regular matrix to perform comparison
+coefficients_matrix <- as.matrix(coefficients_matrix)
+
+# Select the non-zero coefficients
+non_zero_coefficients <- coefficients_matrix[coefficients_matrix != 0]
+
+# Print non-zero coefficients
+cat("Non-zero coefficients for LASSO model are:\n")
+print(non_zero_coefficients)
+```
+
+```{r}
+# best lasso model
+model_lasso <- lm(reading_score_trans ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + wkly_study_hours + parent_educ:parent_marital_status + lunch_type:practice_sport, data = reading_trans)
+summary(model_lasso)
+```
+
 
 - Test the model predictive ability using a 10-fold cross-validation.
 ```{r, message = FALSE, warning=FALSE}
@@ -262,19 +299,20 @@ library(caret)
 train_control <- trainControl(method = "cv", number = 10)
 
 # Fit the model using 10-fold cross-validation
-
-```
 cv_model <- train(
-  life_exp ~ population + hs_grad + log_murder, 
-  data = state_data_transformed, 
+  reading_score_trans ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + wkly_study_hours + parent_educ:parent_marital_status + lunch_type:practice_sport, 
+  data = reading_trans, 
   method = "lm", 
   trControl = train_control
 )
 
+
 print(cv_model)
 
 # To view the RMSE (Root Mean Squared Error) or other metrics
-cv_model$results
+cv_model$results |> knitr::kable()
+```
+
 
 
 
