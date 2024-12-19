@@ -107,18 +107,24 @@ vif(model2)
 
 
 ```{r}
-# Plots
+library(car)
+
+# 1. Linearity and Homoscedasticity
 par(mfrow = c(2, 2))
 plot(model2)
-
-# Check residual normality
-shapiro.test(residuals(model2))
-## not normal --> need to transform
-
-# Multicollinearity
-library(car)
+  
+# 2. Normality of Residuals
+shapiro_test <-
+  shapiro.test(residuals(model2))
+shapiro_test
+  
+# 3. Independence (Durbin-Watson test)
+dw_test <- durbinWatsonTest(model2)
+dw_test
+  
+# 4. No Multicollinearity
 vif_values <- vif(model2)
-print(vif_values)
+vif_values
 ```
 ```{r}
 # Box-Cox
@@ -155,20 +161,25 @@ summary(model3) # improve in adjusted R2
 
 
 ```{r}
-# plots
+# 1. Linearity and Homoscedasticity
 par(mfrow = c(2, 2))
 plot(model3)
-
-# 检查多重共线性
+  
+# 2. Normality of Residuals
+shapiro_test <-
+  shapiro.test(residuals(model3))
+shapiro_test
+  
+# 3. Independence (Durbin-Watson test)
+dw_test <- durbinWatsonTest(model3)
+dw_test
+  
+# 4. No Multicollinearity
 vif_values <- vif(model3)
-print(vif_values)
+vif_values
 ```
 
-```{r}
-# Check residual normality
-shapiro.test(residuals(model3))
-## normal
-```
+
 
 ```{r, message = FALSE, warning=FALSE}
 # Automatic Subset Selection Procedures based on Model3
@@ -216,6 +227,8 @@ selected_variables <-
 print(selected_variables)
 ```
 
+
+
 ```{r, message = FALSE, warning=FALSE}
 # LASSO
 library(glmnet)
@@ -239,6 +252,29 @@ lasso_model <- glmnet(X_matrix, y_vector, alpha = 1, lambda = best_lambda)
 coefficients <- coef(lasso_model)
 print(coefficients)
 ```
+
+- Test the model predictive ability using a 10-fold cross-validation.
+```{r, message = FALSE, warning=FALSE}
+# Load necessary package
+library(caret)
+
+# Set up the cross-validation method (10-fold cross-validation)
+train_control <- trainControl(method = "cv", number = 10)
+
+# Fit the model using 10-fold cross-validation
+
+```
+cv_model <- train(
+  life_exp ~ population + hs_grad + log_murder, 
+  data = state_data_transformed, 
+  method = "lm", 
+  trControl = train_control
+)
+
+print(cv_model)
+
+# To view the RMSE (Root Mean Squared Error) or other metrics
+cv_model$results
 
 
 
